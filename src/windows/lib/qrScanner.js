@@ -254,6 +254,9 @@ qrScanner.disableLight = function () {
   return generateStatusResponse();
 
 }
+qrScanner.setZoomLevel = function () {
+    currentVideoCapture.setZoomLevel();
+}
 
 qrScanner.openSettings = function () {
   return Promise.wrapError(errorTypes.OPEN_SETTINGS_UNAVAILABLE);

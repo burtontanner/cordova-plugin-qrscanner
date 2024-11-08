@@ -24,7 +24,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import android.hardware.Camera;
 import android.provider.Settings;
-import android.support.v4.app.ActivityCompat;
+import androidx.appcompat.app.AppCompatActivity;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -353,19 +353,19 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
             for (int i = 0; i < permissions.length; i++) {
                 String permission = permissions[i];
                 if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
-                    boolean showRationale = ActivityCompat.shouldShowRequestPermissionRationale(cordova.getActivity(), permission);
-                    if (! showRationale) {
+//                     boolean showRationale = AppCompatActivity.shouldShowRequestPermissionRationale(cordova.getActivity(), permission);
+//                     if (! showRationale) {
                         // user denied flagging NEVER ASK AGAIN
-                        denied = true;
-                        authorized = false;
-                        callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
-                        return;
-                    } else {
-                        authorized = false;
                         denied = false;
+                        authorized = false;
                         callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
                         return;
-                    }
+//                     } else {
+//                         authorized = false;
+//                         denied = false;
+//                         callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
+//                         return;
+//                     }
                 } else if (grantResults[i] == PackageManager.PERMISSION_GRANTED){
                     authorized = true;
                     denied = false;
@@ -457,21 +457,47 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                 ArrayList<BarcodeFormat> formatList = new ArrayList<BarcodeFormat>();
                 formatList.add(BarcodeFormat.QR_CODE);
                 formatList.add(BarcodeFormat.DATA_MATRIX);
-                formatList.add(BarcodeFormat.UPC_E);
-                formatList.add(BarcodeFormat.UPC_A);
-                formatList.add(BarcodeFormat.EAN_8);
-                formatList.add(BarcodeFormat.EAN_13);
-                formatList.add(BarcodeFormat.UPC_EAN_EXTENSION);
-                formatList.add(BarcodeFormat.CODE_128);
-                formatList.add(BarcodeFormat.CODE_39);
-                formatList.add(BarcodeFormat.CODE_93);
-                formatList.add(BarcodeFormat.CODABAR);
-                formatList.add(BarcodeFormat.ITF);
-                formatList.add(BarcodeFormat.RSS14);
-                formatList.add(BarcodeFormat.PDF417);
-                formatList.add(BarcodeFormat.RSS_EXPANDED);
-
+//                 formatList.add(BarcodeFormat.UPC_E);
+//                 formatList.add(BarcodeFormat.EAN_8);
+//                 formatList.add(BarcodeFormat.EAN_13);
+//                 formatList.add(BarcodeFormat.CODE_39);
+//                 formatList.add(BarcodeFormat.CODE_93);
+//                 formatList.add(BarcodeFormat.CODE_128);
+//                 formatList.add(BarcodeFormat.ITF);
+//                 formatList.add(BarcodeFormat.PDF_417);
+//                 formatList.add(BarcodeFormat.AZTEC);
                 mBarcodeView.setDecoderFactory(new DefaultDecoderFactory(formatList, null, null));
+
+								mBarcodeView.addStateListener(new BarcodeView.StateListener() {
+										@Override
+										public void previewSized() {}
+
+										@Override
+										public void previewStarted() {
+												try {
+														Camera camera = mBarcodeView.getCameraInstance();
+														if (camera != null) {
+																Camera.Parameters params = camera.getParameters();
+																int maxZoom = params.getMaxZoom();
+																if (maxZoom >= 3) {
+																		params.setZoom(3);  // 3x zoom
+																} else {
+																		params.setZoom(maxZoom);  // Max zoom if 3x is not supported
+																}
+																camera.setParameters(params);
+														}
+												} catch (Exception e) {
+														e.printStackTrace();
+												}
+										}
+
+										@Override
+										public void previewStopped() {}
+										@Override
+										public void cameraError(Exception error) {}
+										@Override
+										public void cameraClosed() {}
+								});
 
                 //Configure the camera (front/back)
                 CameraSettings settings = new CameraSettings();

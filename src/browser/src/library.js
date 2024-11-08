@@ -14,6 +14,7 @@ function QRScanner() {
       enableLight: internal.enableLight,
       disableLight: internal.disableLight,
       useCamera: internal.useCamera,
+      setZoomLevel: internal.setZoomLevel,
       openSettings: internal.openSettings,
       getStatus: internal.getStatus,
       destroy: internal.destroy

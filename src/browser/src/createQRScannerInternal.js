@@ -523,6 +523,9 @@ module.exports = function(){
       success(calcStatus());
     }
   }
+  function setZoomLevel(success, error, array){
+      success(calcStatus());
+  }
 
   function openSettings(success, error){
     error(8); //OPEN_SETTINGS_UNAVAILABLE
@@ -566,6 +569,7 @@ module.exports = function(){
       enableLight: enableLight,
       disableLight: disableLight,
       useCamera: useCamera,
+			setZoomLevel: setZoomLevel,
       openSettings: openSettings,
       getStatus: getStatus,
       destroy: destroy

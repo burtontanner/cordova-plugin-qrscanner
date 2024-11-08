@@ -133,7 +133,7 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             if (captureSession?.isRunning != true){
                 cameraView.backgroundColor = UIColor.clear
                 self.webView!.superview!.insertSubview(cameraView, belowSubview: self.webView!)
-                let availableVideoDevices = AVCaptureDevice.devices(for: AVMediaType.video)
+                let availableVideoDevices =  AVCaptureDevice.devices(for: AVMediaType.video)
                 for device in availableVideoDevices {
                     if device.position == AVCaptureDevice.Position.back {
                         backCamera = device
@@ -153,10 +153,17 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 metaOutput = AVCaptureMetadataOutput()
                 captureSession!.addOutput(metaOutput!)
                 metaOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-                metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.pdf417, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.aztec, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43]
+//                 metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.pdf417, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.aztec, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43]
+                metaOutput!.metadataObjectTypes = [ AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix]
+
                 captureVideoPreviewLayer = AVCaptureVideoPreviewLayer(session: captureSession!)
                 cameraView.addPreviewLayer(captureVideoPreviewLayer)
+                try input.device.lockForConfiguration()
+                let zoomFactor: CGFloat = 3.0  // or the desired zoom level
+                input.device.videoZoomFactor = min(zoomFactor, input.device.activeFormat.videoMaxZoomFactor)
+                input.device.unlockForConfiguration()
                 captureSession!.startRunning()
+                setupCenteredRectOfInterest(for: captureSession!, in: cameraView)
             }
             return true
         } catch CaptureError.backCameraUnavailable {
@@ -172,21 +179,43 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         return false
     }
 
+    func setupCenteredRectOfInterest(for captureSession: AVCaptureSession, in cameraView: UIView) {
+        guard let metadataOutput = captureSession.outputs.first as? AVCaptureMetadataOutput else { return }
+
+        // Define the middle 50% scan-able area
+        let width = cameraView.frame.width * 0.5
+        let height = cameraView.frame.height * 0.5
+        let originX = (cameraView.frame.width - width) / 2
+        let originY = (cameraView.frame.height - height) / 2
+        let scanArea = CGRect(x: originX, y: originY, width: width, height: height)
+
+        // Convert the scanArea to the camera's coordinate system
+        let x = scanArea.origin.y / cameraView.frame.height
+        let y = 1 - ((scanArea.origin.x + scanArea.width) / cameraView.frame.width)
+        let adjustedWidth = scanArea.height / cameraView.frame.height
+        let adjustedHeight = scanArea.width / cameraView.frame.width
+
+        // Set the metadata output’s rect of interest
+        metadataOutput.rectOfInterest = CGRect(x: x, y: y, width: adjustedWidth, height: adjustedHeight)
+    }
+
     @objc func createCaptureDeviceInput() throws -> AVCaptureDeviceInput {
         var captureDevice: AVCaptureDevice
-        if(currentCamera == 0){
-            if(backCamera != nil){
+        if(currentCamera == 0) {
+            if(backCamera != nil) {
                 captureDevice = backCamera!
             } else {
                 throw CaptureError.backCameraUnavailable
             }
         } else {
-            if(frontCamera != nil){
+            if(frontCamera != nil) {
                 captureDevice = frontCamera!
             } else {
                 throw CaptureError.frontCameraUnavailable
             }
         }
+
+
         let captureDeviceInput: AVCaptureDeviceInput
         do {
             captureDeviceInput = try AVCaptureDeviceInput(device: captureDevice)
@@ -195,6 +224,7 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         }
         return captureDeviceInput
     }
+
 
     @objc func makeOpaque(){
         self.webView?.isOpaque = false
@@ -232,13 +262,13 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     // This method processes metadataObjects captured by iOS.
-    func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputMetadataObjects metadataObjects: [Any]!, from connection: AVCaptureConnection!) {
-        if metadataObjects == nil || metadataObjects.count == 0 || scanning == false {
+    func metadataOutput(_ captureOutput: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        if metadataObjects.count == 0 || scanning == false {
             // while nothing is detected, or if scanning is false, do nothing.
             return
         }
         let found = metadataObjects[0] as! AVMetadataMachineReadableCodeObject
-        if (found.stringValue != nil) {
+        if found.stringValue != nil {
             scanning = false
             let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: found.stringValue)
             commandDelegate!.send(pluginResult, callbackId: nextScanningCommand?.callbackId!)
@@ -469,14 +499,14 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     @objc func openSettings(_ command: CDVInvokedUrlCommand) {
         if #available(iOS 10.0, *) {
             guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
-                return
-            }
-            if UIApplication.shared.canOpenURL(settingsUrl) {
-                UIApplication.shared.open(settingsUrl, completionHandler: { (success) in
-                    self.getStatus(command)
-                })
-            } else {
-                self.sendErrorCode(command: command, error: QRScannerError.open_settings_unavailable)
+            return
+        }
+        if UIApplication.shared.canOpenURL(settingsUrl) {
+            UIApplication.shared.open(settingsUrl, completionHandler: { (success) in
+                self.getStatus(command)
+            })
+        } else {
+            self.sendErrorCode(command: command, error: QRScannerError.open_settings_unavailable)
             }
         } else {
             // pre iOS 10.0
