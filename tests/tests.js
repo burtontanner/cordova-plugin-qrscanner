@@ -36,6 +36,9 @@ exports.defineAutoTests = function() {
       it('`useCamera` method should exist', function() {
         expect(typeof window.QRScanner.useCamera).toBe('function');
       });
+      it('`setZoomLevel` method should exist', function() {
+        expect(typeof window.QRScanner.setZoomLevel).toBe('function');
+      });
       it('`useFrontCamera` method should exist', function() {
         expect(typeof window.QRScanner.useFrontCamera).toBe('function');
       });

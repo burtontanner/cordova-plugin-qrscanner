@@ -119,7 +119,27 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             }
         }
     }
+    @objc func setZoomLevel(_ command: CDVInvokedUrlCommand){
+        do {
+            let input = captureSession?.inputs[0] as! AVCaptureDeviceInput
+            try input.device.lockForConfiguration()
 
+            let zoomFactor: CGFloat = command.arguments[0] as! CGFloat;
+
+            let maxZoomFactor = input.device.activeFormat.videoMaxZoomFactor
+            let clampedZoomFactor = min(zoomFactor, maxZoomFactor)
+
+            // Animate zoom over time with a rate (1.0 is a standard zoom rate, adjust as needed)
+            input.device.ramp(toVideoZoomFactor: clampedZoomFactor, withRate: 1.0)
+//          input.device.videoZoomFactor = min(zoomFactor, input.device.activeFormat.videoMaxZoomFactor)
+
+            input.device.unlockForConfiguration()
+        }
+        catch {
+            self.sendErrorCode(command: command, error: QRScannerError.unexpected_error)
+        }
+
+    }
     @objc func prepScanner(command: CDVInvokedUrlCommand) -> Bool{
         let status = AVCaptureDevice.authorizationStatus(for: AVMediaType.video)
         if (status == AVAuthorizationStatus.restricted) {
