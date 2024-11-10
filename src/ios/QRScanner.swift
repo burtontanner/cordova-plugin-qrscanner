@@ -121,7 +121,11 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
     @objc func setZoomLevel(_ command: CDVInvokedUrlCommand){
         do {
-            let input = captureSession?.inputs[0] as! AVCaptureDeviceInput
+            let deviceInput = captureSession?.inputs[0];
+            if(deviceInput == nil) {
+                return;
+            }
+            let input = deviceInput as! AVCaptureDeviceInput
             try input.device.lockForConfiguration()
 
             let zoomFactor: CGFloat = command.arguments[0] as! CGFloat;
