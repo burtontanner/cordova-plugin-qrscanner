@@ -145,6 +145,7 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
 
     }
     @objc func prepScanner(command: CDVInvokedUrlCommand) -> Bool{
+        let ultraWideDevice = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
         let status = AVCaptureDevice.authorizationStatus(for: AVMediaType.video)
         if (status == AVAuthorizationStatus.restricted) {
             self.sendErrorCode(command: command, error: QRScannerError.camera_access_restricted)
@@ -165,6 +166,9 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                     else if device.position == AVCaptureDevice.Position.front {
                         frontCamera = device
                     }
+                }
+                if(ultraWideDevice != nil){
+                    backCamera = ultraWideDevice
                 }
                 // older iPods have no back camera
                 if(backCamera == nil){
