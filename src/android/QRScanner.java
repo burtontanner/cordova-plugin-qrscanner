@@ -1,11 +1,14 @@
 package com.bitpay.cordova.qrscanner;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.FeatureInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.net.Uri;
 
 import com.google.zxing.BarcodeFormat;
@@ -13,7 +16,9 @@ import com.google.zxing.ResultPoint;
 import com.journeyapps.barcodescanner.BarcodeCallback;
 import com.journeyapps.barcodescanner.BarcodeResult;
 import com.journeyapps.barcodescanner.BarcodeView;
+import com.journeyapps.barcodescanner.CameraPreview;
 import com.journeyapps.barcodescanner.DefaultDecoderFactory;
+import com.journeyapps.barcodescanner.camera.CameraInstance;
 import com.journeyapps.barcodescanner.camera.CameraSettings;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
@@ -23,8 +28,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import android.hardware.Camera;
+import android.os.Build;
 import android.provider.Settings;
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.util.DisplayMetrics;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -220,6 +228,47 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
             return false;
         }
     }
+
+    public static int getUltraWideCameraId(Context context) {
+        CameraManager cameraManager = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+        }
+        float smallestFocalLength = 99;
+        int bestCameraId = 0;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                for (String cameraId : cameraManager.getCameraIdList()) {
+                    CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
+
+                    // Check if this is a back-facing camera
+                    Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                    Float focalLength = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)[0];
+                    Float sensorSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE).getWidth();
+                    if (lensFacing != null && lensFacing == CameraCharacteristics.LENS_FACING_BACK) {
+
+                        // Check for the ultra-wide camera by field of view or other characteristics
+
+
+                        // Example logic to detect ultra-wide (adjust based on device testing)
+                        if (focalLength < smallestFocalLength) { // Replace with your condition
+                            smallestFocalLength = focalLength;
+                            bestCameraId = Integer.parseInt(cameraId) ;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return bestCameraId;
+    }
+
+    public int getBestCameraId(){
+        if(mBarcodeView == null)return 0;
+        return getUltraWideCameraId(mBarcodeView.getContext());
+    }
+
 
     @Override
     public void onPause(boolean multitasking) {
@@ -452,7 +501,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
             public void run() {
                 // Create our Preview view and set it as the content of our activity.
                 mBarcodeView = new BarcodeView(cordova.getActivity());
-
+                currentCameraId = getBestCameraId();
                 //Configure the decoder
                 ArrayList<BarcodeFormat> formatList = new ArrayList<BarcodeFormat>();
                 formatList.add(BarcodeFormat.QR_CODE);
@@ -467,37 +516,6 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
 //                 formatList.add(BarcodeFormat.PDF_417);
 //                 formatList.add(BarcodeFormat.AZTEC);
                 mBarcodeView.setDecoderFactory(new DefaultDecoderFactory(formatList, null, null));
-
-								mBarcodeView.addStateListener(new BarcodeView.StateListener() {
-										@Override
-										public void previewSized() {}
-
-										@Override
-										public void previewStarted() {
-												try {
-														Camera camera = mBarcodeView.getCameraInstance();
-														if (camera != null) {
-																Camera.Parameters params = camera.getParameters();
-																int maxZoom = params.getMaxZoom();
-																if (maxZoom >= 3) {
-																		params.setZoom(3);  // 3x zoom
-																} else {
-																		params.setZoom(maxZoom);  // Max zoom if 3x is not supported
-																}
-																camera.setParameters(params);
-														}
-												} catch (Exception e) {
-														e.printStackTrace();
-												}
-										}
-
-										@Override
-										public void previewStopped() {}
-										@Override
-										public void cameraError(Exception error) {}
-										@Override
-										public void cameraClosed() {}
-								});
 
                 //Configure the camera (front/back)
                 CameraSettings settings = new CameraSettings();
