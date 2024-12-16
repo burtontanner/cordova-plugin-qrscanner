@@ -12,9 +12,11 @@ import android.hardware.camera2.CameraManager;
 import android.net.Uri;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.ResultPoint;
 import com.journeyapps.barcodescanner.BarcodeCallback;
 import com.journeyapps.barcodescanner.BarcodeResult;
+import com.journeyapps.barcodescanner.DecoratedBarcodeView;
 import com.journeyapps.barcodescanner.BarcodeView;
 import com.journeyapps.barcodescanner.CameraPreview;
 import com.journeyapps.barcodescanner.DefaultDecoderFactory;
@@ -31,6 +33,7 @@ import android.hardware.Camera;
 import android.os.Build;
 import android.provider.Settings;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -41,6 +44,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 @SuppressWarnings("deprecation")
@@ -513,6 +517,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                 currentCameraId = getBestCameraId();
                 //Configure the decoder
                 ArrayList<BarcodeFormat> formatList = new ArrayList<BarcodeFormat>();
+//                formatList.add(BarcodeFormat.ITF);
 //                formatList.add(BarcodeFormat.MAXICODE);
 
                 formatList.add(BarcodeFormat.CODABAR);
@@ -532,7 +537,9 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
 //                 formatList.add(BarcodeFormat.ITF);
 //                 formatList.add(BarcodeFormat.PDF_417);
 //                 formatList.add(BarcodeFormat.AZTEC);
-                mBarcodeView.setDecoderFactory(new DefaultDecoderFactory(formatList, null, null));
+                Map<DecodeHintType, Object> hints = new HashMap<>();
+                hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+                mBarcodeView.setDecoderFactory(new DefaultDecoderFactory(formatList, hints, null));
 
                 //Configure the camera (front/back)
                 CameraSettings settings = new CameraSettings();
