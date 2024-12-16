@@ -126,15 +126,16 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 return;
             }
             let input = deviceInput as! AVCaptureDeviceInput
-            try input.device.lockForConfiguration()
+
 
             let zoomFactor: CGFloat = command.arguments[0] as! CGFloat;
 
             let maxZoomFactor = input.device.activeFormat.videoMaxZoomFactor
             let clampedZoomFactor = min(zoomFactor, maxZoomFactor)
 
+            try input.device.lockForConfiguration()
             // Animate zoom over time with a rate (1.0 is a standard zoom rate, adjust as needed)
-            input.device.ramp(toVideoZoomFactor: clampedZoomFactor, withRate: 1.0)
+            input.device.ramp(toVideoZoomFactor: clampedZoomFactor, withRate: 3.0)
 //          input.device.videoZoomFactor = min(zoomFactor, input.device.activeFormat.videoMaxZoomFactor)
 
             input.device.unlockForConfiguration()
@@ -181,16 +182,21 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 metaOutput = AVCaptureMetadataOutput()
                 captureSession!.addOutput(metaOutput!)
                 metaOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-//                 metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.pdf417, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.aztec, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43]
-                metaOutput!.metadataObjectTypes = [ AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix]
+//                metaOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.global(qos: .userInitiated))
+                metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43, AVMetadataObject.ObjectType.gs1DataBar, AVMetadataObject.ObjectType.gs1DataBarLimited, AVMetadataObject.ObjectType.gs1DataBarExpanded]
+//                metaOutput!.metadataObjectTypes = [ AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix]
 
                 captureVideoPreviewLayer = AVCaptureVideoPreviewLayer(session: captureSession!)
                 cameraView.addPreviewLayer(captureVideoPreviewLayer)
+
                 try input.device.lockForConfiguration()
-                let zoomFactor: CGFloat = 3.0  // or the desired zoom level
-                input.device.videoZoomFactor = min(zoomFactor, input.device.activeFormat.videoMaxZoomFactor)
-                input.device.unlockForConfiguration()
-                captureSession!.startRunning()
+                DispatchQueue.global(qos: DispatchQoS.QoSClass.userInitiated).async {
+                    let zoomFactor: CGFloat = 3.0  // or the desired zoom level
+                    input.device.videoZoomFactor = min(zoomFactor, input.device.activeFormat.videoMaxZoomFactor)
+                    input.device.unlockForConfiguration()
+
+                    self.captureSession!.startRunning()
+                }
                 setupCenteredRectOfInterest(for: captureSession!, in: cameraView)
             }
             return true
@@ -274,12 +280,25 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         }
         do {
             // torch is only available for back camera
-            if(backCamera == nil || backCamera!.hasTorch == false || backCamera!.isTorchAvailable == false || backCamera!.isTorchModeSupported(useMode) == false){
+            if(self.backCamera == nil){
+                print("self.backCamera == nil")
                 throw LightError.torchUnavailable
             }
-            try backCamera!.lockForConfiguration()
-            backCamera!.torchMode = useMode
-            backCamera!.unlockForConfiguration()
+            if(self.backCamera!.hasTorch == false){
+                print("self.backCamera!.hasTorch == false")
+                throw LightError.torchUnavailable
+            }
+            if(self.backCamera!.isTorchAvailable == false){
+                print("self.backCamera!.isTorchAvailable == false")
+                throw LightError.torchUnavailable
+            }
+            if(self.backCamera!.isTorchModeSupported(useMode) == false){
+                print("self.backCamera!.isTorchModeSupported(useMode) == false")
+                throw LightError.torchUnavailable
+            }
+            try self.backCamera!.lockForConfiguration()
+            self.backCamera!.torchMode = useMode
+            self.backCamera!.unlockForConfiguration()
             self.getStatus(command)
         } catch LightError.torchUnavailable {
             self.sendErrorCode(command: command, error: QRScannerError.light_unavailable)
@@ -296,9 +315,13 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             return
         }
         let found = metadataObjects[0] as! AVMetadataMachineReadableCodeObject
+        print(found.type.rawValue)
+        print(found.stringValue)
         if found.stringValue != nil {
+            let text:String = found.stringValue ?? "";
+            let message = "{\"text\":\"" + text + "\",\"type\":\"" + found.type.rawValue + "\"}";
             scanning = false
-            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: found.stringValue)
+            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: message)
             commandDelegate!.send(pluginResult, callbackId: nextScanningCommand?.callbackId!)
             nextScanningCommand = nil
         }

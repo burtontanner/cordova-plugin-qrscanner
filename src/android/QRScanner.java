@@ -33,6 +33,7 @@ import android.provider.Settings;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -230,12 +231,17 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
     }
 
     public static int getUltraWideCameraId(Context context) {
+        if(true) {
+            return Camera.CameraInfo.CAMERA_FACING_BACK;
+        }
+        // no way to accurately pick the wide camera without sometimes returning the front camera.
+        //        https://stackoverflow.com/questions/57115158/camera-2-cameracharacteristics-seem-to-show-incorrect-data
         CameraManager cameraManager = null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         }
         float smallestFocalLength = 99;
-        int bestCameraId = 0;
+        int bestCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 for (String cameraId : cameraManager.getCameraIdList()) {
@@ -243,9 +249,11 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
 
                     // Check if this is a back-facing camera
                     Integer lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                    Integer sensorOrientation =  characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                     Float focalLength = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)[0];
                     Float sensorSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE).getWidth();
-                    if (lensFacing != null && lensFacing == CameraCharacteristics.LENS_FACING_BACK) {
+//                    Log.d("CameraInfo", "Sensor Orientation: " + sensorOrientation);
+                    if (lensFacing != null && lensFacing == CameraCharacteristics.LENS_FACING_BACK && sensorOrientation == 90) {
 
                         // Check for the ultra-wide camera by field of view or other characteristics
 
@@ -260,6 +268,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            return Camera.CameraInfo.CAMERA_FACING_BACK;
         }
         return bestCameraId;
     }
@@ -404,11 +413,11 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                 if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
 //                     boolean showRationale = AppCompatActivity.shouldShowRequestPermissionRationale(cordova.getActivity(), permission);
 //                     if (! showRationale) {
-                        // user denied flagging NEVER ASK AGAIN
-                        denied = false;
-                        authorized = false;
-                        callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
-                        return;
+                    // user denied flagging NEVER ASK AGAIN
+                    denied = false;
+                    authorized = false;
+                    callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
+                    return;
 //                     } else {
 //                         authorized = false;
 //                         denied = false;
@@ -504,14 +513,22 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                 currentCameraId = getBestCameraId();
                 //Configure the decoder
                 ArrayList<BarcodeFormat> formatList = new ArrayList<BarcodeFormat>();
-                formatList.add(BarcodeFormat.QR_CODE);
+//                formatList.add(BarcodeFormat.MAXICODE);
+
+                formatList.add(BarcodeFormat.CODABAR);
+                formatList.add(BarcodeFormat.CODE_128);
+                formatList.add(BarcodeFormat.CODE_39);
+                formatList.add(BarcodeFormat.CODE_93);
                 formatList.add(BarcodeFormat.DATA_MATRIX);
-//                 formatList.add(BarcodeFormat.UPC_E);
-//                 formatList.add(BarcodeFormat.EAN_8);
-//                 formatList.add(BarcodeFormat.EAN_13);
-//                 formatList.add(BarcodeFormat.CODE_39);
-//                 formatList.add(BarcodeFormat.CODE_93);
-//                 formatList.add(BarcodeFormat.CODE_128);
+                formatList.add(BarcodeFormat.EAN_13);
+                formatList.add(BarcodeFormat.EAN_8);
+                formatList.add(BarcodeFormat.QR_CODE);
+                formatList.add(BarcodeFormat.RSS_14);
+                formatList.add(BarcodeFormat.RSS_EXPANDED);
+                formatList.add(BarcodeFormat.UPC_A);
+                formatList.add(BarcodeFormat.UPC_E);
+                formatList.add(BarcodeFormat.UPC_EAN_EXTENSION);
+
 //                 formatList.add(BarcodeFormat.ITF);
 //                 formatList.add(BarcodeFormat.PDF_417);
 //                 formatList.add(BarcodeFormat.AZTEC);
@@ -546,7 +563,7 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
 
         if(barcodeResult.getText() != null) {
             scanning = false;
-            this.nextScanCallback.success(barcodeResult.getText());
+            this.nextScanCallback.success("{\"text\":\"" + barcodeResult.getText() + "\",\"type\":\""+barcodeResult.getBarcodeFormat().toString()+"\"}");
             this.nextScanCallback = null;
         }
         else {
