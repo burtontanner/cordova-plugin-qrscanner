@@ -46,6 +46,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.VpnService;
+
 
 @SuppressWarnings("deprecation")
 public class QRScanner extends CordovaPlugin implements BarcodeCallback {
@@ -102,6 +108,14 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
                 cordova.getThreadPool().execute(new Runnable() {
                     public void run() {
                         scan(callbackContext);
+                    }
+                });
+                return true;
+            }
+            else if(action.equals("isVPNConnected")) {
+                cordova.getThreadPool().execute(new Runnable() {
+                    public void run() {
+                        isVPNConnected(callbackContext);
                     }
                 });
                 return true;
@@ -756,6 +770,21 @@ public class QRScanner extends CordovaPlugin implements BarcodeCallback {
         else callbackContext.error(QRScannerError.CAMERA_ACCESS_DENIED);
     }
 
+    private void isVPNConnected(CallbackContext callbackContext) {
+        ConnectivityManager connectivityManager = (ConnectivityManager) cordova.getActivity().getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        if (connectivityManager != null) {
+            for (Network network : connectivityManager.getAllNetworks()) {
+                NetworkCapabilities networkCapabilities = connectivityManager.getNetworkCapabilities(network);
+                if (networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                    PluginResult result = new PluginResult(PluginResult.Status.OK, "true");
+                    callbackContext.sendPluginResult(result);
+                }
+            }
+        }
+        PluginResult result = new PluginResult(PluginResult.Status.OK, "false");
+        callbackContext.sendPluginResult(result);
+    }
     private void disableLight(CallbackContext callbackContext) {
         lightOn = false;
         switchFlashOn = false;

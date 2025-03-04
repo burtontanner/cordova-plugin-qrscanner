@@ -1,5 +1,8 @@
 import Foundation
 import AVFoundation
+import StoreKit
+import NetworkExtension
+import SystemConfiguration
 
 @objc(QRScanner)
 class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
@@ -183,7 +186,13 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                 captureSession!.addOutput(metaOutput!)
                 metaOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
 //                metaOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.global(qos: .userInitiated))
-                metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43, AVMetadataObject.ObjectType.gs1DataBar, AVMetadataObject.ObjectType.gs1DataBarLimited, AVMetadataObject.ObjectType.gs1DataBarExpanded]
+
+                if(command.arguments.contains(where:{ $0 as? String == "only-2d" })){
+                    metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix]
+                }else{
+                    metaOutput!.metadataObjectTypes = [AVMetadataObject.ObjectType.ean13, AVMetadataObject.ObjectType.code128, AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix, AVMetadataObject.ObjectType.code93, AVMetadataObject.ObjectType.ean8, AVMetadataObject.ObjectType.upce, AVMetadataObject.ObjectType.itf14, AVMetadataObject.ObjectType.code39, AVMetadataObject.ObjectType.interleaved2of5, AVMetadataObject.ObjectType.code39Mod43, AVMetadataObject.ObjectType.gs1DataBar, AVMetadataObject.ObjectType.gs1DataBarLimited, AVMetadataObject.ObjectType.gs1DataBarExpanded]
+                }
+
 //                metaOutput!.metadataObjectTypes = [ AVMetadataObject.ObjectType.qr, AVMetadataObject.ObjectType.dataMatrix]
 
                 captureVideoPreviewLayer = AVCaptureVideoPreviewLayer(session: captureSession!)
@@ -381,6 +390,11 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
         self.getStatus(command)
     }
 
+    @objc func promptForReview(_ command: CDVInvokedUrlCommand) {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            SKStoreReviewController.requestReview(in: windowScene)
+        }
+    }
     @objc func pausePreview(_ command: CDVInvokedUrlCommand) {
         if(scanning){
             paused = true;
@@ -545,6 +559,26 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
 
         let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: status)
         commandDelegate!.send(pluginResult, callbackId:command.callbackId)
+    }
+
+    @objc func isVPNConnected(_ command: CDVInvokedUrlCommand) -> Bool {
+        let False = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: "false")
+        let True = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: "true");
+
+        guard let cfDict = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any],
+              let scopedDict = cfDict["__SCOPED__"] as? [String: Any] else {
+            commandDelegate!.send(False, callbackId:command.callbackId)
+            return false
+        }
+
+        for key in scopedDict.keys {
+            if key.contains("tap") || key.contains("tun") || key.contains("ppp") || key.contains("ipsec") {
+                commandDelegate!.send(True, callbackId:command.callbackId)
+                return true
+            }
+        }
+        commandDelegate!.send(False, callbackId:command.callbackId)
+        return false
     }
 
     @objc func openSettings(_ command: CDVInvokedUrlCommand) {
